@@ -1,0 +1,65 @@
+---
+title: "Stock Prediction"
+author: "Ross Luo"
+date: "2025-08-31"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+# Load required libraries
+library(readr)
+library(dplyr)
+library(forecast)
+library(lubridate)
+
+```
+
+```{r}
+
+
+# --- Step 1: Prepare historical data ---
+data <- read_csv("C:/Users/rhoad/OneDrive/桌面/Fiance Report/515980_SS_data.csv", show_col_types = FALSE)
+data <- data[-1, ]  # remove first row if needed
+
+numeric_cols <- c("Close", "High", "Low", "Open", "Volume")
+data <- data %>%
+  mutate(across(all_of(numeric_cols), as.numeric))
+
+data$Date <- as.Date(data$Date)
+
+# --- Step 2: Forecast ---
+ts_close <- ts(data$Close, frequency = 252)  # 252 trading days/year
+model <- auto.arima(ts_close)
+forecast_days <- 30
+fc <- forecast(model, h = forecast_days)
+
+forecast_dates <- seq(from = max(data$Date) + 1, by = "days", length.out = forecast_days)
+
+forecast_df <- tibble(
+  Date = forecast_dates,
+  Forecast_Close = as.numeric(fc$mean),
+  Lower_95 = as.numeric(fc$lower[,2]),
+  Upper_95 = as.numeric(fc$upper[,2]),
+  Open = NA_real_,
+  High = NA_real_,
+  Low = NA_real_,
+  Close = NA_real_,
+  Volume = NA_real_
+)
+
+# --- Step 3: Keep historical data and add forecast columns ---
+historical_df <- data %>%
+  mutate(
+    Forecast_Close = NA_real_,
+    Lower_95 = NA_real_,
+    Upper_95 = NA_real_
+  )
+
+# --- Step 4: Combine ---
+combined_df <- bind_rows(historical_df, forecast_df) %>%
+  arrange(Date)
+
+# --- Step 5: Export to CSV for Power BI ---
+write_csv(combined_df, "C:/Users/rhoad/OneDrive/桌面/Fiance Report/stock_forecast_full.csv")
+
+```
